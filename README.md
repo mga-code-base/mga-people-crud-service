@@ -1,4 +1,3 @@
-```
 # 👥 mga-people-crud-service
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4%2F4.0-6DB33F?logo=springboot)](https://spring.io/)
@@ -29,10 +28,37 @@ It operates strictly beneath `mga-people-service` in a CQRS/Data-Layer Separatio
 
 ---
 
-## 📡 Key REST Endpoints (/crud/)
-* Admins: POST /crud/admins, POST /crud/admins/primary, GET /crud/admins/{id}, PUT /crud/admins/{id}, DELETE /crud/admins/{id}
-* Members: POST /crud/members, GET /crud/members/{id}, PUT /crud/members/{id}/trainer, PUT /crud/members/{id}/facial-status
-* Trainers: POST /crud/trainers, GET /crud/trainers/all, PUT /crud/trainers/approve/{trainerid}
+## 📡 Core API Controller Endpoints
+
+### Admin Controller (`/crud/admins`)
+* `POST /crud/admins` - Save/register new admin profile
+* `POST /crud/admins/primary` - Save primary admin profile (`admin_0`)
+* `GET /crud/admins/{id}` - Fetch admin details by ID
+* `GET /crud/admins/by-email/{email}` - Fetch admin profile by email address
+* `GET /crud/admins/all` - List all registered admins
+* `GET /crud/admins/inactive` - List inactive/unapproved admin profiles
+* `PUT /crud/admins/{id}` - Update admin details by ID
+* `DELETE /crud/admins/{id}` - Soft-delete or remove admin account by ID
+
+### Member Controller (`/crud/members`)
+* `POST /crud/members` - Save/register new member profile
+* `GET /crud/members/{id}` - Fetch member details by ID
+* `GET /crud/members/by-email/{email}` - Fetch member profile by email address
+* `GET /crud/members/all` - List all registered members
+* `PUT /crud/members/{id}` - Update member profile details
+* `PUT /crud/members/{id}/trainer` - Update assigned trainer for member
+* `PUT /crud/members/{id}/facial-status` - Update facial biometric registration status flag
+* `DELETE /crud/members/{id}` - Delete member profile by ID
+
+### Trainer Controller (`/crud/trainers`)
+* `POST /crud/trainers` - Save/register new trainer profile
+* `GET /crud/trainers/{id}` - Fetch trainer profile by ID
+* `GET /crud/trainers/by-email/{email}` - Fetch trainer details by email address
+* `GET /crud/trainers/all` - List all active trainers
+* `GET /crud/trainers/inactive` - List pending/inactive trainer accounts
+* `PUT /crud/trainers/{id}` - Update trainer profile details
+* `PUT /crud/trainers/approve/{trainerId}` - Approve and activate trainer account
+* `DELETE /crud/trainers/{id}` - Remove trainer record by ID
 
 ---
 
@@ -45,5 +71,3 @@ It operates strictly beneath `mga-people-service` in a CQRS/Data-Layer Separatio
 
 # Paketo OCI Native Container Image
 ./gradlew bootBuildImage
-
-```
