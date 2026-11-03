@@ -2,7 +2,7 @@ package com.mygym.app.service;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 import org.springframework.stereotype.Service;
 
@@ -10,27 +10,26 @@ import com.mygym.app.models.Member;
 import com.mygym.app.models.MemberWrapper;
 import com.mygym.app.repository.MemberRepository;
 
-/**
- * Service managing member lifecycle, trainer assignments, and membership duration extensions.
- */
 @Service
 public class MemberCrudService {
 
     private final MemberRepository repository;
-    private final IdGenerationService service;
-    
-    public MemberCrudService(MemberRepository repository, IdGenerationService service) {
-        this.service = service;
+    private final IdGenerationService idGenerationService;
+    private final PasswordService passwordService;
+
+    public MemberCrudService(MemberRepository repository, IdGenerationService idGenerationService, PasswordService passwordService) {
         this.repository = repository;
+        this.idGenerationService = idGenerationService;
+        this.passwordService = passwordService;
     }
 
     public Member createMember(Member member) {
-        if (repository.findByUsername(member.getUsername()).isPresent()) {
-            return new Member("-1");
+        if (repository.findByUsername(member.username()).isPresent()) {
+            return Member.notFound();
         }
-        member.setMemberId(String.valueOf(service.getMemberId()));
-        service.incrementMemberId();
-        return repository.save(member);
+        return repository.save(member
+                .withMemberId(idGenerationService.nextMemberId())
+                .withPassword(passwordService.hash(member.password())));
     }
 
     public List<Member> getAllMembers() {
@@ -38,92 +37,65 @@ public class MemberCrudService {
     }
 
     public Member getMemberById(String id) {
-        return repository.findByMemberId(id).map(member -> member).orElse(new Member("-1"));
+        return repository.findByMemberId(id).orElse(Member.notFound());
     }
-    
+
     public Member getMemberByUsername(String username) {
-        return repository.findByUsername(username).map(member -> member).orElse(new Member("-1"));
+        return repository.findByUsername(username).orElse(Member.notFound());
+    }
+
+    public Member authenticate(String username, String password) {
+        return repository.findByUsername(username)
+                .filter(member -> passwordService.matches(password, member.password()))
+                .map(member -> passwordService.needsUpgrade(member.password())
+                        ? repository.save(member.withPassword(passwordService.hash(password)))
+                        : member)
+                .orElse(Member.notFound());
     }
 
     public Member updateMember(String id, Member updatedData) {
-        Member existing = getMemberById(id);
-        existing.set_id(existing.get_id());
-        existing.setName(updatedData.getName());
-        existing.setMobileNumber(updatedData.getMobileNumber());
-        existing.setEmailAddress(updatedData.getEmailAddress());
-        existing.setMembershipStartDate(updatedData.getMembershipStartDate());
-        existing.setMembershipEndDate(updatedData.getMembershipEndDate());
-        existing.setIsPrivilegedMember(updatedData.getIsPrivilegedMember());
-        existing.setLocalityPincode(updatedData.getLocalityPincode());
-        existing.setPhoto(updatedData.getPhoto());
-        existing.setUsername(updatedData.getUsername());
-        existing.setPassword(updatedData.getPassword());
-        existing.setTrainerAssigned(updatedData.getTrainerAssigned());
-        existing.setAddedByAdminId(updatedData.getAddedByAdminId());
-        return repository.save(existing);
+        return repository.findByMemberId(id)
+                .map(existing -> repository.save(existing.withProfileFrom(updatedData,
+                        passwordService.hashOrKeep(updatedData.password(), existing.password()))))
+                .orElse(Member.notFound());
     }
 
     public Boolean deleteMember(String id) {
-        try {
-            repository.deleteByMemberId(id);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    public MemberWrapper findInactiveMembers() {
-        List<Member> inactiveMembers = repository.findInactiveMembers();
-
-        return (Objects.isNull(inactiveMembers) || inactiveMembers.isEmpty()) 
-                ? new MemberWrapper() 
-                : new MemberWrapper(inactiveMembers);
-    }
-    
-    public MemberWrapper findByTrainerId(String trainerId) {
-        List<Member> members = repository.findByTrainerAssigned(trainerId);
-        return (Objects.isNull(members) || members.isEmpty()) 
-                ? new MemberWrapper() 
-                : new MemberWrapper(members);
-    }
-    
-    public Boolean updateFaceRegistrationStatus(String adminId) {
-        repository.findByMemberId(adminId).ifPresent(admin -> {
-            admin.setIsFacialRegCompleted(true);
-            repository.save(admin);
-        });
+        repository.deleteByMemberId(id);
         return true;
+    }
+
+    public MemberWrapper findInactiveMembers() {
+        return new MemberWrapper(repository.findInactiveMembers());
+    }
+
+    public MemberWrapper findByTrainerId(String trainerId) {
+        return new MemberWrapper(repository.findByTrainerAssigned(trainerId));
+    }
+
+    public Boolean updateFaceRegistrationStatus(String memberId) {
+        return modify(memberId, member -> member.withIsFacialRegCompleted(true));
     }
 
     public Boolean approveMembership(String id, String duration) {
-        repository.findByMemberId(id).ifPresent(admin -> {
-            admin.setIsActive(true);
-            admin.setMembershipStartDate(LocalDate.now().toString());
-            admin.setMembershipEndDate(LocalDate.now().plusDays(Long.valueOf(duration)).toString());
-            repository.save(admin);
-        });
-        return true;
+        LocalDate today = LocalDate.now();
+        return modify(id, member -> member.withMembership(true, today.toString(),
+                today.plusDays(Long.parseLong(duration)).toString()));
     }
 
     public Boolean updateMembershipEndDate(String memberId, Integer duration) {
-        repository.findByMemberId(memberId).ifPresent(admin -> {
-            if (Objects.nonNull(admin.getMembershipEndDate()))	
-                admin.setMembershipEndDate(
-                        LocalDate.parse(admin.getMembershipEndDate())
-                        .plusDays(Long.valueOf(duration)).toString());
-            else
-                admin.setMembershipEndDate(LocalDate.now()
-                        .plusDays(Long.valueOf(duration)).toString());
-            repository.save(admin);
+        return modify(memberId, member -> {
+            LocalDate base = member.membershipEndDate() != null ? LocalDate.parse(member.membershipEndDate()) : LocalDate.now();
+            return member.withMembership(member.isActive(), member.membershipStartDate(), base.plusDays(duration).toString());
         });
-        return true;
     }
 
     public Boolean updateTrainerForMember(String memberId, String trainerId) {
-        repository.findByMemberId(memberId).ifPresent(admin -> {
-            admin.setTrainerAssigned(trainerId);
-            repository.save(admin);
-        });
+        return modify(memberId, member -> member.withTrainerAssigned(trainerId));
+    }
+
+    private Boolean modify(String memberId, UnaryOperator<Member> change) {
+        repository.findByMemberId(memberId).ifPresent(member -> repository.save(change.apply(member)));
         return true;
     }
 }

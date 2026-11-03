@@ -1,6 +1,7 @@
 package com.mygym.app.controller;
 
 import static com.mygym.app.util.PeopleCrudConstants.ADMIN_CRUD_REST_BASE;
+import static com.mygym.app.util.PeopleCrudConstants.AUTHENTICATE_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.CREATE_PRIMARY_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.ID_PLACEHOLDER_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.INACTIVE_ADMIN_ENDPOINT;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mygym.app.dto.LoginRequest;
 import com.mygym.app.models.Admin;
 import com.mygym.app.models.AdminWrapper;
 import com.mygym.app.service.AdminCrudService;
@@ -42,11 +44,7 @@ public class AdminCrudController {
 
     @GetMapping(ID_PLACEHOLDER_ENDPOINT)
     public Admin readByAdminId(@PathVariable(name = "id") String id) {
-        try {
-			return service.getAdminByAdminId(id);
-		} catch (RuntimeException e) {
-			return new Admin("-1");
-		}
+        return service.getAdminByAdminId(id);
     }
 
     @PutMapping(ID_PLACEHOLDER_ENDPOINT)
@@ -54,9 +52,9 @@ public class AdminCrudController {
         return service.updateAdmin(id, admin);
     }
     
-    @GetMapping
-    public Admin findCredByUsername(@RequestParam("username") String username) {
-    	return service.findCredByUsername(username);
+    @PostMapping(AUTHENTICATE_ENDPOINT)
+    public Admin authenticate(@RequestBody LoginRequest request) {
+        return service.authenticate(request.username(), request.password());
     }
     
     @GetMapping(INACTIVE_ADMIN_ENDPOINT)

@@ -1,5 +1,6 @@
 package com.mygym.app.controller;
 
+import static com.mygym.app.util.PeopleCrudConstants.AUTHENTICATE_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.GET_BY_TRAINER_ID_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.ID_PLACEHOLDER_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.INACTIVE_MEMBER_ENDPOINT;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mygym.app.dto.LoginRequest;
 import com.mygym.app.models.Member;
 import com.mygym.app.models.MemberWrapper;
 import com.mygym.app.service.MemberCrudService;
@@ -59,6 +61,11 @@ public class MemberCrudController {
     @GetMapping(USERNAME_PLACEHOLDER_ENDPOINT)
     public Member readByUsername(@PathVariable("username") String username) {
         return service.getMemberByUsername(username);
+    }
+
+    @PostMapping(AUTHENTICATE_ENDPOINT)
+    public Member authenticate(@RequestBody LoginRequest request) {
+        return service.authenticate(request.username(), request.password());
     }
 
     @PutMapping(ID_PLACEHOLDER_ENDPOINT)

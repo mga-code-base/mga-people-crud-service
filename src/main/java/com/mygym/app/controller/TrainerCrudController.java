@@ -1,6 +1,7 @@
 package com.mygym.app.controller;
 
 import static com.mygym.app.util.PeopleCrudConstants.ALL_INACTIVE_TRAINERS_ENDPOINT;
+import static com.mygym.app.util.PeopleCrudConstants.AUTHENTICATE_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.ALL_TRAINERS_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.APPROVE_BY_TRAINER_ID_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.DISABLE_BY_TRAINER_ID_ENDPOINT;
@@ -11,8 +12,6 @@ import static com.mygym.app.util.PeopleCrudConstants.USERNAME_PLACEHOLDER_ENDPOI
 
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mygym.app.dto.LoginRequest;
 import com.mygym.app.models.Trainer;
 import com.mygym.app.models.TrainerWrapper;
 import com.mygym.app.service.TrainerCrudService;
@@ -31,7 +31,6 @@ import com.mygym.app.service.TrainerCrudService;
 @RequestMapping(TRAINER_CRUD_REST_BASE)
 public class TrainerCrudController {
 
-	private static final Logger logger = LoggerFactory.getLogger(TrainerCrudController.class);
     private final TrainerCrudService service;
 
     public TrainerCrudController(TrainerCrudService service) {
@@ -40,7 +39,7 @@ public class TrainerCrudController {
 
     @PostMapping
     public String create(@RequestBody Trainer trainer) {
-        return service.createTrainer(trainer).getTrainerId();
+        return service.createTrainer(trainer).trainerId();
     }
 
     @GetMapping(ALL_TRAINERS_ENDPOINT)
@@ -58,10 +57,9 @@ public class TrainerCrudController {
         return service.readByUsername(username);
     }
     
-    @GetMapping
-    public Trainer findCredByUsername(@RequestParam("username") String username) {
-        logger.info("Login request received on Trainer CRUD Controller tracking user execution");
-    	return service.findCredByUsername(username);
+    @PostMapping(AUTHENTICATE_ENDPOINT)
+    public Trainer authenticate(@RequestBody LoginRequest request) {
+        return service.authenticate(request.username(), request.password());
     }
     
     @PutMapping(ID_PLACEHOLDER_ENDPOINT)
@@ -86,8 +84,6 @@ public class TrainerCrudController {
     
     @DeleteMapping(TRAINER_ID_PLACEHOLDER_ENDPOINT)
     public Boolean deleteTrainer(@PathVariable("trainerid") String trainerId) {
-    	if(service.deleteTrainer(trainerId))
-    		return true;
-    	return false;
+    	return service.deleteTrainer(trainerId);
     }
 }

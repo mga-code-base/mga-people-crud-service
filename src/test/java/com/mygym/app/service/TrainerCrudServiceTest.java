@@ -1,19 +1,26 @@
 package com.mygym.app.service;
 
-import com.mygym.app.models.Trainer;
-import com.mygym.app.repository.TrainerRepository;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static com.mygym.app.service.PeopleFixtures.trainer;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.mygym.app.models.Trainer;
+import com.mygym.app.repository.TrainerRepository;
 
 @ExtendWith(MockitoExtension.class)
 class TrainerCrudServiceTest {
@@ -24,54 +31,46 @@ class TrainerCrudServiceTest {
     @Mock
     private IdGenerationService idGenerationService;
 
+    @Spy
+    private PasswordService passwordService = new PasswordService();
+
     @InjectMocks
     private TrainerCrudService trainerCrudService;
 
     @Test
-    @DisplayName("Should create trainer profile and increment trainer ID sequence")
+    @DisplayName("Should create trainer with the next sequence ID and a hashed password")
     void testCreateTrainer_Success() {
-        Trainer trainer = new Trainer();
-        trainer.setUsername("trainer_mike");
-
         when(repository.findByUsername("trainer_mike")).thenReturn(Optional.empty());
-        when(idGenerationService.getTrainerId()).thenReturn(201L);
+        when(idGenerationService.nextTrainerId()).thenReturn("201");
         when(repository.save(any(Trainer.class))).thenAnswer(i -> i.getArgument(0));
 
-        Trainer created = trainerCrudService.createTrainer(trainer);
+        Trainer created = trainerCrudService.createTrainer(trainer(null, "trainer_mike", "pw", false));
 
-        assertEquals("201", created.getTrainerId());
-        verify(idGenerationService, times(1)).incrementTrainerId();
+        assertEquals("201", created.trainerId());
+        assertTrue(passwordService.matches("pw", created.password()));
     }
 
     @Test
-    @DisplayName("Should approve trainer profile by setting isActive to true")
+    @DisplayName("Should approve trainer profile by saving isActive true")
     void testApproveTrainer_Success() {
-        Trainer trainer = new Trainer();
-        trainer.setTrainerId("201");
-        trainer.setIsActive(false);
+        when(repository.findByTrainerId("201")).thenReturn(Optional.of(trainer("201", "t", null, false)));
 
-        when(repository.findByTrainerId("201")).thenReturn(Optional.of(trainer));
+        assertTrue(trainerCrudService.approveTrainer("201"));
 
-        Boolean approved = trainerCrudService.approveTrainer("201");
-
-        assertTrue(approved);
-        assertTrue(trainer.getIsActive());
-        verify(repository, times(1)).save(trainer);
+        ArgumentCaptor<Trainer> saved = ArgumentCaptor.forClass(Trainer.class);
+        verify(repository).save(saved.capture());
+        assertTrue(saved.getValue().isActive());
     }
 
     @Test
-    @DisplayName("Should disable trainer profile by setting isActive to false")
+    @DisplayName("Should disable trainer profile by saving isActive false")
     void testDisableTrainer_Success() {
-        Trainer trainer = new Trainer();
-        trainer.setTrainerId("201");
-        trainer.setIsActive(true);
+        when(repository.findByTrainerId("201")).thenReturn(Optional.of(trainer("201", "t", null, true)));
 
-        when(repository.findByTrainerId("201")).thenReturn(Optional.of(trainer));
+        assertTrue(trainerCrudService.disableTrainer("201"));
 
-        Boolean disabled = trainerCrudService.disableTrainer("201");
-
-        assertTrue(disabled);
-        assertFalse(trainer.getIsActive());
-        verify(repository, times(1)).save(trainer);
+        ArgumentCaptor<Trainer> saved = ArgumentCaptor.forClass(Trainer.class);
+        verify(repository).save(saved.capture());
+        assertFalse(saved.getValue().isActive());
     }
 }

@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AdminRepository extends MongoRepository<Admin, String> {
 
-    // Custom query builder to find documents matching your custom admin_id field
     Optional<Admin> findByAdminId(String adminId);
     
     Optional<Admin> findByUsername(String username);

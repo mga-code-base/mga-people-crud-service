@@ -1,9 +1,18 @@
 package com.mygym.app.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -11,11 +20,6 @@ import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class IdGenerationServiceTest {
@@ -35,33 +39,32 @@ class IdGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw RuntimeException during init when sequence document is missing")
+    @DisplayName("Should fail init when sequence document is missing")
     void testInit_SequenceDocumentMissing_ThrowsException() {
         when(mongoTemplate.exists(any(Query.class), eq("_people"))).thenReturn(false);
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> idGenerationService.init());
-        assertTrue(exception.getMessage().contains("Failed to verify ID sequences in MongoDB"));
+        assertThrows(IllegalStateException.class, () -> idGenerationService.init());
     }
 
     @Test
-    @DisplayName("Should fetch current admin id value")
-    void testGetAdminId_Success() {
-        Document doc = new Document("nextAdminId", 105L);
-        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("_people"))).thenReturn(doc);
-
-        Long adminId = idGenerationService.getAdminId();
-
-        assertEquals(105L, adminId);
-    }
-
-    @Test
-    @DisplayName("Should increment admin id successfully")
-    void testIncrementAdminId_Success() {
-        Document updatedDoc = new Document("nextAdminId", 106L);
+    @DisplayName("Should reserve an ID with a single atomic increment and return the pre-increment value")
+    void testNextAdminId_SingleAtomicOperation() {
         when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Document.class), eq("_people")))
-                .thenReturn(updatedDoc);
+                .thenReturn(new Document("nextAdminId", 105L));
 
-        assertDoesNotThrow(() -> idGenerationService.incrementAdminId());
-        verify(mongoTemplate, times(1)).findAndModify(any(), any(), any(), eq(Document.class), eq("_people"));
+        assertEquals("105", idGenerationService.nextAdminId());
+
+        ArgumentCaptor<FindAndModifyOptions> options = ArgumentCaptor.forClass(FindAndModifyOptions.class);
+        verify(mongoTemplate).findAndModify(any(Query.class), any(Update.class), options.capture(), eq(Document.class), eq("_people"));
+        assertEquals(false, options.getValue().isReturnNew());
+    }
+
+    @Test
+    @DisplayName("Should fail when the sequence field cannot be incremented")
+    void testNextMemberId_MissingDocument_Throws() {
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Document.class), eq("_people")))
+                .thenReturn(null);
+
+        assertThrows(IllegalStateException.class, () -> idGenerationService.nextMemberId());
     }
 }

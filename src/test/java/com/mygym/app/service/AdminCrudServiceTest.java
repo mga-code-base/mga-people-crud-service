@@ -1,21 +1,29 @@
 package com.mygym.app.service;
 
-import com.mygym.app.models.Admin;
-import com.mygym.app.models.AdminWrapper;
-import com.mygym.app.repository.AdminRepository;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static com.mygym.app.service.PeopleFixtures.admin;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.mygym.app.models.Admin;
+import com.mygym.app.models.AdminWrapper;
+import com.mygym.app.repository.AdminRepository;
 
 @ExtendWith(MockitoExtension.class)
 class AdminCrudServiceTest {
@@ -26,87 +34,93 @@ class AdminCrudServiceTest {
     @Mock
     private IdGenerationService idGenerationService;
 
+    @Spy
+    private PasswordService passwordService = new PasswordService();
+
     @InjectMocks
     private AdminCrudService adminCrudService;
 
     @Test
     @DisplayName("Should return existing admin with ID '-1' if duplicate credentials found")
     void testCreateAdmin_DuplicateExists_ReturnsAdminWithMinusOneId() {
-        Admin inputAdmin = new Admin();
-        inputAdmin.setUsername("john_admin");
-        inputAdmin.setMobileNumber("9876543210");
-        inputAdmin.setEmailAddress("john@gym.com");
-
-        Admin existing = new Admin();
-        existing.setUsername("john_admin");
-
+        Admin input = admin(null, "john_admin", "pw", "9876543210", "john@gym.com", false);
         when(repository.findByUsernameOrMobileOrEmail("john_admin", "9876543210", "john@gym.com"))
-                .thenReturn(Optional.of(existing));
+                .thenReturn(Optional.of(admin("7", "john_admin", "hash", null, null, true)));
 
-        Admin result = adminCrudService.createAdmin(inputAdmin);
+        Admin result = adminCrudService.createAdmin(input);
 
-        assertEquals("-1", result.getAdminId());
+        assertEquals("-1", result.adminId());
         verify(repository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Should assign ID '0' when creating primary admin account")
+    @DisplayName("Should assign ID '0' to the primary admin without touching the sequence")
     void testCreateAdmin_PrimaryAdmin_AssignsIdZero() {
-        Admin inputAdmin = new Admin();
-        inputAdmin.setUsername("admin");
-
         when(repository.findByUsernameOrMobileOrEmail(any(), any(), any())).thenReturn(Optional.empty());
         when(repository.save(any(Admin.class))).thenAnswer(i -> i.getArgument(0));
 
-        Admin result = adminCrudService.createAdmin(inputAdmin);
+        Admin result = adminCrudService.createAdmin(admin(null, "admin", "pw", null, null, false));
 
-        assertEquals("0", result.getAdminId());
-        verify(idGenerationService, never()).getAdminId();
+        assertEquals("0", result.adminId());
+        verify(idGenerationService, never()).nextAdminId();
     }
 
     @Test
-    @DisplayName("Should fetch generated ID from IdGenerationService for standard admin")
-    void testCreateAdmin_StandardAdmin_GeneratesNewId() {
-        Admin inputAdmin = new Admin();
-        inputAdmin.setUsername("branch_admin");
-
+    @DisplayName("Should take the next sequence value and store a hashed password for a standard admin")
+    void testCreateAdmin_StandardAdmin_GeneratesNewIdAndHashesPassword() {
         when(repository.findByUsernameOrMobileOrEmail(any(), any(), any())).thenReturn(Optional.empty());
-        when(idGenerationService.getAdminId()).thenReturn(101L);
+        when(idGenerationService.nextAdminId()).thenReturn("101");
         when(repository.save(any(Admin.class))).thenAnswer(i -> i.getArgument(0));
 
-        Admin result = adminCrudService.createAdmin(inputAdmin);
+        Admin result = adminCrudService.createAdmin(admin(null, "branch_admin", "pw", null, null, false));
 
-        assertEquals("101", result.getAdminId());
-        verify(idGenerationService, times(1)).incrementAdminId();
+        assertEquals("101", result.adminId());
+        assertEquals("101", result.branchId());
+        assertTrue(passwordService.matches("pw", result.password()));
     }
 
     @Test
-    @DisplayName("Should return inactive admins wrapper when inactive records exist")
-    void testFindInactiveAdmins_RecordsFound_ReturnsWrapper() {
-        Admin admin1 = new Admin();
-        admin1.setAdminId("101");
+    @DisplayName("Should authenticate against the stored hash")
+    void testAuthenticate_ValidPassword_ReturnsAdmin() {
+        Admin stored = admin("101", "branch_admin", passwordService.hash("pw"), null, null, true);
+        when(repository.findCredByUsername("branch_admin")).thenReturn(Optional.of(stored));
 
-        when(repository.findInactiveAdmins()).thenReturn(List.of(admin1));
+        assertEquals("101", adminCrudService.authenticate("branch_admin", "pw").adminId());
+        assertNull(adminCrudService.authenticate("branch_admin", "wrong").adminId());
+    }
+
+    @Test
+    @DisplayName("Should upgrade a legacy plain-text password to BCrypt on successful login")
+    void testAuthenticate_LegacyPassword_IsUpgraded() {
+        when(repository.findCredByUsername("old_admin")).thenReturn(Optional.of(admin("5", "old_admin", "pw", null, null, true)));
+        when(repository.save(any(Admin.class))).thenAnswer(i -> i.getArgument(0));
+
+        adminCrudService.authenticate("old_admin", "pw");
+
+        ArgumentCaptor<Admin> saved = ArgumentCaptor.forClass(Admin.class);
+        verify(repository).save(saved.capture());
+        assertTrue(saved.getValue().password().startsWith("$2"));
+    }
+
+    @Test
+    @DisplayName("Should return inactive admins wrapper")
+    void testFindInactiveAdmins_ReturnsWrapper() {
+        when(repository.findInactiveAdmins()).thenReturn(List.of(admin("101", "a", null, null, null, false)));
 
         AdminWrapper result = adminCrudService.findInactiveAdmins();
 
-        assertNotNull(result);
-        verify(repository, times(1)).findInactiveAdmins();
+        assertEquals(1, result.allAdmins().size());
     }
 
     @Test
-    @DisplayName("Should set isActive to true on updateAdminStatus")
+    @DisplayName("Should save the admin as active on updateAdminStatus")
     void testUpdateAdminStatus_Success() {
-        Admin admin = new Admin();
-        admin.setAdminId("101");
-        admin.setIsActive(false);
+        when(repository.findByAdminId("101")).thenReturn(Optional.of(admin("101", "a", null, null, null, false)));
 
-        when(repository.findByAdminId("101")).thenReturn(Optional.of(admin));
+        assertTrue(adminCrudService.updateAdminStatus("101"));
 
-        Boolean status = adminCrudService.updateAdminStatus("101");
-
-        assertTrue(status);
-        assertTrue(admin.getIsActive());
-        verify(repository, times(1)).save(admin);
+        ArgumentCaptor<Admin> saved = ArgumentCaptor.forClass(Admin.class);
+        verify(repository).save(saved.capture());
+        assertTrue(saved.getValue().isActive());
     }
 }

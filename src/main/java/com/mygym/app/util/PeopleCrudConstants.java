@@ -7,6 +7,8 @@ public class PeopleCrudConstants {
 	
 	public static final String ID_PLACEHOLDER_ENDPOINT = "/{id}";
 	
+	public static final String AUTHENTICATE_ENDPOINT = "/authenticate";
+	
 	public static final String INACTIVE_ADMIN_ENDPOINT = "/inactiveadmins";
 	
 	public static final String UPDATE_ADMIN_STATUS_ENDPOINT = "/updatestatus/{id}";
