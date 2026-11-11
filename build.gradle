@@ -84,3 +84,12 @@ tasks.named('processAot') {
 contracts {
 	baseClassForTests = 'com.mygym.app.contract.ContractVerifierBase'
 }
+
+publishing {
+	publications {
+		stubs(MavenPublication) {
+			artifactId = project.name
+			artifact verifierStubsJar
+		}
+	}
+}
