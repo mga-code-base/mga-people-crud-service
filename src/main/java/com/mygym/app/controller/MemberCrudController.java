@@ -13,6 +13,10 @@ import static com.mygym.app.util.PeopleCrudConstants.USERNAME_PLACEHOLDER_ENDPOI
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
+
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +31,7 @@ import com.mygym.app.dto.LoginRequest;
 import com.mygym.app.models.Member;
 import com.mygym.app.models.MemberWrapper;
 import com.mygym.app.service.MemberCrudService;
+import com.mygym.app.validation.OnCreate;
 
 @RestController
 @RequestMapping(MEMBER_CRUD_REST_BASE)
@@ -39,7 +44,7 @@ public class MemberCrudController {
     }
 
     @PostMapping
-    public Member create(@RequestBody Member member) {
+    public Member create(@Validated({Default.class, OnCreate.class}) @RequestBody Member member) {
         return service.createMember(member);
     }
 
@@ -64,12 +69,12 @@ public class MemberCrudController {
     }
 
     @PostMapping(AUTHENTICATE_ENDPOINT)
-    public Member authenticate(@RequestBody LoginRequest request) {
+    public Member authenticate(@Valid @RequestBody LoginRequest request) {
         return service.authenticate(request.username(), request.password());
     }
 
     @PutMapping(ID_PLACEHOLDER_ENDPOINT)
-    public Member update(@PathVariable("id") String id, @RequestBody Member member) {
+    public Member update(@PathVariable("id") String id, @Valid @RequestBody Member member) {
         return service.updateMember(id, member);
     }
     

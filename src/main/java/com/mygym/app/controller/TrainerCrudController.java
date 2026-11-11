@@ -1,9 +1,9 @@
 package com.mygym.app.controller;
 
 import static com.mygym.app.util.PeopleCrudConstants.ALL_INACTIVE_TRAINERS_ENDPOINT;
-import static com.mygym.app.util.PeopleCrudConstants.AUTHENTICATE_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.ALL_TRAINERS_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.APPROVE_BY_TRAINER_ID_ENDPOINT;
+import static com.mygym.app.util.PeopleCrudConstants.AUTHENTICATE_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.DISABLE_BY_TRAINER_ID_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.ID_PLACEHOLDER_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.TRAINER_CRUD_REST_BASE;
@@ -12,6 +12,10 @@ import static com.mygym.app.util.PeopleCrudConstants.USERNAME_PLACEHOLDER_ENDPOI
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
+
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +30,7 @@ import com.mygym.app.dto.LoginRequest;
 import com.mygym.app.models.Trainer;
 import com.mygym.app.models.TrainerWrapper;
 import com.mygym.app.service.TrainerCrudService;
+import com.mygym.app.validation.OnCreate;
 
 @RestController
 @RequestMapping(TRAINER_CRUD_REST_BASE)
@@ -38,7 +43,7 @@ public class TrainerCrudController {
     }
 
     @PostMapping
-    public String create(@RequestBody Trainer trainer) {
+    public String create(@Validated({Default.class, OnCreate.class}) @RequestBody Trainer trainer) {
         return service.createTrainer(trainer).trainerId();
     }
 
@@ -58,12 +63,12 @@ public class TrainerCrudController {
     }
     
     @PostMapping(AUTHENTICATE_ENDPOINT)
-    public Trainer authenticate(@RequestBody LoginRequest request) {
+    public Trainer authenticate(@Valid @RequestBody LoginRequest request) {
         return service.authenticate(request.username(), request.password());
     }
     
     @PutMapping(ID_PLACEHOLDER_ENDPOINT)
-    public Trainer update(@PathVariable String id, @RequestBody Trainer trainer) {
+    public Trainer update(@PathVariable String id, @Valid @RequestBody Trainer trainer) {
         return service.updateTrainer(id, trainer);
     }
     

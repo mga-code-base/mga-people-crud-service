@@ -1,0 +1,13 @@
+description: An admin is fetched by its business id
+request:
+  method: GET
+  url: /crud/admins/7
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    adminId: "7"
+    name: Alex Rao
+    username: admin.alex
+    branch: "3"

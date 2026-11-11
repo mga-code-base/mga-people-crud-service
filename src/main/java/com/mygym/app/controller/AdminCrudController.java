@@ -7,6 +7,10 @@ import static com.mygym.app.util.PeopleCrudConstants.ID_PLACEHOLDER_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.INACTIVE_ADMIN_ENDPOINT;
 import static com.mygym.app.util.PeopleCrudConstants.UPDATE_ADMIN_STATUS_ENDPOINT;
 
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
+
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +25,7 @@ import com.mygym.app.dto.LoginRequest;
 import com.mygym.app.models.Admin;
 import com.mygym.app.models.AdminWrapper;
 import com.mygym.app.service.AdminCrudService;
+import com.mygym.app.validation.OnCreate;
 
 @RestController
 @RequestMapping(ADMIN_CRUD_REST_BASE)
@@ -33,7 +38,7 @@ public class AdminCrudController {
     }
 
     @PostMapping
-    public Admin create(@RequestBody Admin admin) {
+    public Admin create(@Validated({Default.class, OnCreate.class}) @RequestBody Admin admin) {
         return service.createAdmin(admin);
     }
     
@@ -48,12 +53,12 @@ public class AdminCrudController {
     }
 
     @PutMapping(ID_PLACEHOLDER_ENDPOINT)
-    public Admin update(@PathVariable String id, @RequestBody Admin admin) {
+    public Admin update(@PathVariable String id, @Valid @RequestBody Admin admin) {
         return service.updateAdmin(id, admin);
     }
     
     @PostMapping(AUTHENTICATE_ENDPOINT)
-    public Admin authenticate(@RequestBody LoginRequest request) {
+    public Admin authenticate(@Valid @RequestBody LoginRequest request) {
         return service.authenticate(request.username(), request.password());
     }
     
